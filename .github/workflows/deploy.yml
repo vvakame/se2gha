@@ -1,0 +1,45 @@
+name: Deploy to Cloud Run
+
+on:
+  push:
+    branches:
+      - master
+
+env:
+  GCP_PROJECT_ID: vvakame-playground
+  GCP_REGION: us-central1
+  SERVICE_NAME: se2gha
+  IMAGE_TAG: gcr.io/vvakame-playground/se2gha:commit_${{ github.sha }}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+        with:
+          version: "315.0.0"
+          project_id: ${{ env.GCP_PROJECT_ID }}
+          service_account_key: ${{ secrets.GCP_SA_JSON }}
+          export_default_credentials: true
+      - name: Build
+        run: |-
+          gcloud builds submit --tag "${{ env.IMAGE_TAG }}"
+      - name: Deploy
+        run: |-
+          gcloud run deploy "${SERVICE_NAME}" \
+              --project "${GCP_PROJECT_ID}" \
+              --region "${GCP_REGION}" \
+              --image "${{ env.IMAGE_TAG }}" \
+              --platform managed \
+              --allow-unauthenticated \
+              --no-traffic \
+              --set-env-vars SLACK_SIGNING_SECRET=${{ secrets.SLACK_SIGNING_SECRET }} \
+              --quiet
+      - name: Release
+        run: |-
+          gcloud run services update-traffic "${SERVICE_NAME}" \
+              --to-latest \
+              --region "${GCP_REGION}" \
+              --platform managed \
+              --quiet

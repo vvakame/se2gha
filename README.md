@@ -1,25 +1,22 @@
-# 謎のなにか予定地
-
-ではあるんだけど、まず[Waypoint](https://www.waypointproject.io/)を試している。
+# se2gha
 
 ```
-$ brew tap hashicorp/tap
-$ brew install hashicorp/tap/waypoint
-$ waypoint install --platform=docker -accept-tos
-
 $ git clone git@github.com:vvakame/se2gha.git
-$ waypoint init
-$ waypoint up
-# waypoint build && waypoint deploy && waypoint release
-$ waypoint ui
-```
-
-```
-# got `Unable to list regions for project...` error
-$ gcloud auth application-default login
-
-# https://www.waypointproject.io/docs/troubleshooting
-$ docker stop waypoint-server
-$ docker rm waypoint-server
-$ docker volume prune -f
+$ GCP_PROJECT_ID=vvakame-playground
+$ GCP_REGION=us-central1
+$ APPLICATION=se2gha
+$ gcloud builds submit --tag "gcr.io/${GCP_PROJECT_ID}/${APPLICATION}:hogehoge"
+$ gcloud run deploy "${APPLICATION}" \
+    --project "${GCP_PROJECT_ID}" \
+    --region "${GCP_REGION}" \
+    --image "gcr.io/${GCP_PROJECT_ID}/${APPLICATION}:hogehoge" \
+    --platform managed \
+    --allow-unauthenticated \
+    --no-traffic \
+    --quiet
+$ gcloud run services update-traffic "${APPLICATION}" \
+    --to-latest \
+    --region "${GCP_REGION}" \
+    --platform managed \
+    --quiet
 ```

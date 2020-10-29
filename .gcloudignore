@@ -1,4 +1,3 @@
-.waypoint
-data.db
+.github/
 
-*.hcl
+vvakame-playground-*.json
