@@ -4,9 +4,7 @@ project = "se2gha"
 
 app "se2gha" {
   build {
-    use "pack" {
-      builder = "gcr.io/buildpacks/builder:v1"
-    }
+    use "docker" {}
 
     registry {
       use "docker" {
