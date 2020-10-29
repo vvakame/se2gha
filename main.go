@@ -121,7 +121,9 @@ func main() {
 			return
 		}
 
-		w.WriteHeader(http.StatusNotImplemented)
+		Logf(ctx, "event: %s", string(b))
+
+		w.WriteHeader(http.StatusOK)
 	})
 
 	port := os.Getenv("PORT")
