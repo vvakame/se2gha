@@ -41,3 +41,20 @@ func Logf(ctx context.Context, format string, a ...interface{}) {
 	}
 	fmt.Println(string(b))
 }
+
+func Warnf(ctx context.Context, format string, a ...interface{}) {
+	ctx, err := buildlog.WithConfigurator(ctx, buildlog.DefaultConfigurator)
+	if err != nil {
+		panic(err)
+	}
+
+	logEntry := buildlog.NewLogEntry(ctx, buildlog.WithSourceLocationSkip(4))
+	logEntry.Severity = buildlog.SeverityWarning
+	logEntry.Message = fmt.Sprintf(format, a...)
+
+	b, err := json.Marshal(logEntry)
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(b))
+}
