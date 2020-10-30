@@ -17,6 +17,9 @@ import (
 	"strings"
 	"syscall"
 	"time"
+
+	"go.opencensus.io/exporter/stackdriver/propagation"
+	"go.opencensus.io/plugin/ochttp"
 )
 
 func main() {
@@ -131,9 +134,13 @@ func main() {
 		port = "8080"
 	}
 
+	och := &ochttp.Handler{
+		Propagation: &propagation.HTTPFormat{},
+		Handler:     mux,
+	}
 	srv := &http.Server{
 		Addr:    fmt.Sprintf(":%s", port),
-		Handler: mux,
+		Handler: och,
 	}
 
 	go func() {

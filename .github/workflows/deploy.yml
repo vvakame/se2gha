@@ -34,7 +34,7 @@ jobs:
               --platform managed \
               --allow-unauthenticated \
               --no-traffic \
-              --set-env-vars SLACK_SIGNING_SECRET=${{ secrets.SLACK_SIGNING_SECRET }} \
+              --set-env-vars "GOOGLE_CLOUD_PROJECT=${GCP_PROJECT_ID},SLACK_SIGNING_SECRET=${{ secrets.SLACK_SIGNING_SECRET }}" \
               --quiet
       - name: Release
         run: |-
