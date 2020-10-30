@@ -34,7 +34,12 @@ jobs:
               --platform managed \
               --allow-unauthenticated \
               --no-traffic \
-              --set-env-vars "GOOGLE_CLOUD_PROJECT=${GCP_PROJECT_ID},SLACK_ACCESS_TOKEN=${{ secrets.SLACK_ACCESS_TOKEN }},SLACK_SIGNING_SECRET=${{ secrets.SLACK_SIGNING_SECRET }}" \
+              --set-env-vars "GOOGLE_CLOUD_PROJECT=${GCP_PROJECT_ID}" \
+              --set-env-vars "SLACK_ACCESS_TOKEN=${{ secrets.SLACK_ACCESS_TOKEN }}" \
+              --set-env-vars "SLACK_SIGNING_SECRET=${{ secrets.SLACK_SIGNING_SECRET }}" \
+              --set-env-vars "GHA_REPO_TOKEN=${{ secrets.GHA_REPO_TOKEN }}" \
+              --set-env-vars "GHA_REPO_OWNER=${{ secrets.GHA_REPO_OWNER }}" \
+              --set-env-vars "GHA_REPO_NAME=${{ secrets.GHA_REPO_NAME }}" \
               --quiet
       - name: Release
         run: |-

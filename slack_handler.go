@@ -9,14 +9,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/slack-go/slack"
-	"github.com/slack-go/slack/slackevents"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/slack-go/slack"
+	"github.com/slack-go/slack/slackevents"
 )
 
 var api = slack.New(os.Getenv("SLACK_ACCESS_TOKEN"))
@@ -103,6 +104,29 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 		teamInfo, err := api.GetTeamInfoContext(ctx)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(err.Error()))
+			Warnf(ctx, err.Error())
+			return
+		}
+
+		userProfile, err := api.GetUserProfileContext(ctx, ch.Messages[0].User, false)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = w.Write([]byte(err.Error()))
+			Warnf(ctx, err.Error())
+			return
+		}
+
+		err = dispatchGitHubEvent(ctx, &DispatchGitHubEventRequest{
+			SlackEvent:     b,
+			SlackEventType: fmt.Sprintf("%s-%s", rae.Type, rae.Reaction),
+			SlackUserName:  userProfile.DisplayName,
+			Text:           ch.Messages[0].Text,
+			Reaction:       rae.Reaction,
+			Link:           fmt.Sprintf("https://%s.slack.com/archives/%s/p%s", teamInfo.Name, rae.Item.Channel, strings.ReplaceAll(rae.Item.Timestamp, ".", "")),
+		})
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(err.Error()))
 			Warnf(ctx, err.Error())
 			return
