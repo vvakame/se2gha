@@ -33,7 +33,7 @@ func dispatchGitHubEvent(ctx context.Context, req *DispatchGitHubEventRequest) e
 	Debugf(ctx, "github dispatch event: %s", string(b))
 
 	clientPayload := json.RawMessage(b)
-	repo, resp, err := client.Repositories.Dispatch(
+	_, _, err = client.Repositories.Dispatch(
 		ctx,
 		os.Getenv("GHA_REPO_OWNER"),
 		os.Getenv("GHA_REPO_NAME"),
@@ -45,9 +45,6 @@ func dispatchGitHubEvent(ctx context.Context, req *DispatchGitHubEventRequest) e
 	if err != nil {
 		return err
 	}
-
-	Debugf(ctx, "repo: %#v", repo)
-	Debugf(ctx, "resp: %#v", resp)
 
 	return nil
 }
