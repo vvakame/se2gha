@@ -1,0 +1,34 @@
+name: 'Create new issue by Slack :create-issue: reaction'
+on:
+  repository_dispatch:
+    types:
+      # trigger from https://github.com/vvakame/se2gha Cloud Run instance
+      - slack-event-reaction_added-create-issue
+jobs:
+  process:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/github-script@v3
+        id:   create-issue
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          result-encoding: string
+          script: |
+            const event = context.payload.client_payload;
+            const bq = "`";
+            const body = `
+            Someone added ${bq}:${event.reaction}:${bq} reaction on slack!
+
+            [${event.slack_user_name} said](${event.link}),
+            ${event.text}
+            `;
+            const resp = await github.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: event.text,
+              body: body.trim(),
+            });
+            return resp.data.html_url;
+      - name: Show result
+        run: echo "${{steps.create-issue.outputs.result}}"

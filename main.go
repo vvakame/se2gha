@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -17,7 +17,23 @@ import (
 	_ "github.com/slack-go/slack"
 )
 
+var receivers []*ReceiverRepo
+
+type ReceiverRepo struct {
+	Owner string
+	Name  string
+}
+
 func main() {
+	{
+		repos, err := parseReceiverRepos(os.Getenv("GHA_REPOS"))
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		receivers = repos
+	}
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("Hello, world"))
@@ -56,26 +72,30 @@ func main() {
 	log.Println("Server shutdown")
 }
 
-type Request struct {
-	Token     string `json:"token"`
-	Challenge string `json:"challenge"`
-	Type      string `json:"type"`
-}
+func parseReceiverRepos(reposStr string) ([]*ReceiverRepo, error) {
+	reposStr = strings.TrimSpace(reposStr)
+	ss1 := strings.Split(reposStr, ",")
 
-type Response struct {
-	Challenge string `json:"challenge"`
-}
+	var repos []*ReceiverRepo
+	for _, s := range ss1 {
+		s = strings.TrimSpace(s)
+		if s == "" {
+			continue
+		}
+		ss2 := strings.SplitN(s, "/", 2)
+		if len(ss2) != 2 {
+			return nil, fmt.Errorf("invalid GHA_REPOS syntax: %s", s)
+		}
 
-// use this when adding new event subscriptions
-// https://api.slack.com/events/url_verification
-func slackChallengeHandler(w http.ResponseWriter, r *http.Request) {
-	b, err := ioutil.ReadAll(r.Body)
-	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		return
+		repos = append(repos, &ReceiverRepo{
+			Owner: ss2[0],
+			Name:  ss2[1],
+		})
 	}
-	defer r.Body.Close()
 
-	Logf(r.Context(), string(b))
+	if len(repos) == 0 {
+		return nil, fmt.Errorf("invalid GHA_REPOS: %s", reposStr)
+	}
 
+	return repos, nil
 }

@@ -38,8 +38,7 @@ jobs:
               --set-env-vars "SLACK_ACCESS_TOKEN=${{ secrets.SLACK_ACCESS_TOKEN }}" \
               --set-env-vars "SLACK_SIGNING_SECRET=${{ secrets.SLACK_SIGNING_SECRET }}" \
               --set-env-vars "GHA_REPO_TOKEN=${{ secrets.GHA_REPO_TOKEN }}" \
-              --set-env-vars "GHA_REPO_OWNER=${{ secrets.GHA_REPO_OWNER }}" \
-              --set-env-vars "GHA_REPO_NAME=${{ secrets.GHA_REPO_NAME }}" \
+              --set-env-vars "GHA_REPOS=${{ secrets.GHA_REPOS }}" \
               --quiet
       - name: Release
         run: |-

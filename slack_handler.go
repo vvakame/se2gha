@@ -22,6 +22,16 @@ import (
 
 var api = slack.New(os.Getenv("SLACK_ACCESS_TOKEN"))
 
+type Request struct {
+	Token     string `json:"token"`
+	Challenge string `json:"challenge"`
+	Type      string `json:"type"`
+}
+
+type Response struct {
+	Challenge string `json:"challenge"`
+}
+
 func eventHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
@@ -29,6 +39,7 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(err.Error()))
+		Warnf(ctx, err.Error())
 		return
 	}
 	defer r.Body.Close()
@@ -36,6 +47,7 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 	if s, err := checkSignature(ctx, r.Header, b); err != nil {
 		w.WriteHeader(s)
 		_, _ = w.Write([]byte(err.Error()))
+		Warnf(ctx, err.Error())
 		return
 	}
 

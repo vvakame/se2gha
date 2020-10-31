@@ -33,17 +33,20 @@ func dispatchGitHubEvent(ctx context.Context, req *DispatchGitHubEventRequest) e
 	Debugf(ctx, "github dispatch event: %s", string(b))
 
 	clientPayload := json.RawMessage(b)
-	_, _, err = client.Repositories.Dispatch(
-		ctx,
-		os.Getenv("GHA_REPO_OWNER"),
-		os.Getenv("GHA_REPO_NAME"),
-		github.DispatchRequestOptions{
-			EventType:     fmt.Sprintf("slack-event-%s", req.SlackEventType),
-			ClientPayload: &clientPayload,
-		},
-	)
-	if err != nil {
-		return err
+	for _, receiver := range receivers {
+		Debugf(ctx, "dispatch event to %s/%s", receiver.Owner, receiver.Name)
+		_, _, err = client.Repositories.Dispatch(
+			ctx,
+			receiver.Owner,
+			receiver.Name,
+			github.DispatchRequestOptions{
+				EventType:     fmt.Sprintf("slack-event-%s", req.SlackEventType),
+				ClientPayload: &clientPayload,
+			},
+		)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
