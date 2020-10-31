@@ -58,6 +58,7 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	Debugf(ctx, "event type: %s", req.Type)
 	switch req.Type {
 	case "url_verification":
 		respJSON := &Response{req.Challenge}
@@ -72,7 +73,7 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 		return
 
 	case "event_callback":
-		Logf(ctx, "type: %s, event: %s", req.Type, string(b))
+		Debugf(ctx, "event payload: %s", string(b))
 
 		ev, err := slackevents.ParseEvent(
 			b,
@@ -150,7 +151,7 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 		return
 
 	default:
-		Logf(ctx, "type: %s, event: %s", req.Type, string(b))
+		Debugf(ctx, "event payload: %s", string(b))
 	}
 
 	w.WriteHeader(http.StatusOK)
