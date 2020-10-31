@@ -11,9 +11,9 @@ import (
 )
 
 type DispatchGitHubEventRequest struct {
-	SlackEvent     json.RawMessage `json:"slackEvent"`
-	SlackEventType string          `json:"slackEventType"`
-	SlackUserName  string          `json:"slackUserName"`
+	SlackEvent     json.RawMessage `json:"slack_event"`
+	SlackEventType string          `json:"slack_event_type"`
+	SlackUserName  string          `json:"slack_user_name"`
 	Text           string          `json:"text"`
 	Reaction       string          `json:"reaction"`
 	Link           string          `json:"link"`
