@@ -133,7 +133,7 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 		err = dispatchGitHubEvent(ctx, &DispatchGitHubEventRequest{
 			SlackEvent:     b,
 			SlackEventType: fmt.Sprintf("%s-%s", rae.Type, rae.Reaction),
-			SlackUserName:  userProfile.DisplayName,
+			SlackUserName:  userProfile.RealName,
 			Text:           ch.Messages[0].Text,
 			Reaction:       rae.Reaction,
 			Link:           fmt.Sprintf("https://%s.slack.com/archives/%s/p%s", teamInfo.Name, rae.Item.Channel, strings.ReplaceAll(rae.Item.Timestamp, ".", "")),
@@ -145,8 +145,6 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		Logf(ctx, "reaction: %s to %s message", rae.Reaction, ch.Messages[0].Text)
-		Logf(ctx, "https://%s.slack.com/archives/%s/p%s", teamInfo.Name, rae.Item.Channel, rae.Item.Timestamp)
 		w.WriteHeader(http.StatusOK)
 		return
 
