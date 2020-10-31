@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/google/go-github/v32/github"
+	"github.com/vvakame/se2gha/log"
 	"golang.org/x/oauth2"
 )
 
@@ -30,11 +31,11 @@ func dispatchGitHubEvent(ctx context.Context, req *DispatchGitHubEventRequest) e
 	if err != nil {
 		return err
 	}
-	Debugf(ctx, "github dispatch event: %s", string(b))
+	log.Debugf(ctx, "github dispatch event: %s", string(b))
 
 	clientPayload := json.RawMessage(b)
 	for _, receiver := range receivers {
-		Debugf(ctx, "dispatch event to %s/%s", receiver.Owner, receiver.Name)
+		log.Debugf(ctx, "dispatch event to %s/%s", receiver.Owner, receiver.Name)
 		_, _, err = client.Repositories.Dispatch(
 			ctx,
 			receiver.Owner,

@@ -1,4 +1,4 @@
-package main
+package log
 
 import (
 	"context"
@@ -25,7 +25,7 @@ func Debugf(ctx context.Context, format string, a ...interface{}) {
 	fmt.Println(string(b))
 }
 
-func Logf(ctx context.Context, format string, a ...interface{}) {
+func Infof(ctx context.Context, format string, a ...interface{}) {
 	ctx, err := buildlog.WithConfigurator(ctx, buildlog.DefaultConfigurator)
 	if err != nil {
 		panic(err)

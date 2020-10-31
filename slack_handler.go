@@ -18,6 +18,7 @@ import (
 
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
+	"github.com/vvakame/se2gha/log"
 )
 
 var api = slack.New(os.Getenv("SLACK_ACCESS_TOKEN"))
@@ -39,7 +40,7 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(err.Error()))
-		Warnf(ctx, err.Error())
+		log.Warnf(ctx, err.Error())
 		return
 	}
 	defer r.Body.Close()
@@ -47,7 +48,7 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 	if s, err := checkSignature(ctx, r.Header, b); err != nil {
 		w.WriteHeader(s)
 		_, _ = w.Write([]byte(err.Error()))
-		Warnf(ctx, err.Error())
+		log.Warnf(ctx, err.Error())
 		return
 	}
 
@@ -58,7 +59,7 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	Debugf(ctx, "event type: %s", req.Type)
+	log.Debugf(ctx, "event type: %s", req.Type)
 	switch req.Type {
 	case "url_verification":
 		respJSON := &Response{req.Challenge}
@@ -73,7 +74,7 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 		return
 
 	case "event_callback":
-		Debugf(ctx, "event payload: %s", string(b))
+		log.Debugf(ctx, "event payload: %s", string(b))
 
 		ev, err := slackevents.ParseEvent(
 			b,
@@ -82,7 +83,7 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = w.Write([]byte(err.Error()))
-			Warnf(ctx, err.Error())
+			log.Warnf(ctx, err.Error())
 			return
 		}
 
@@ -91,7 +92,7 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 			msg := fmt.Sprintf("unexpected event data type1: %T", ev.InnerEvent.Data)
 			_, _ = w.Write([]byte(msg))
-			Warnf(ctx, msg)
+			log.Warnf(ctx, msg)
 			return
 		}
 
@@ -104,13 +105,13 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = w.Write([]byte(err.Error()))
-			Warnf(ctx, err.Error())
+			log.Warnf(ctx, err.Error())
 			return
 		}
 		if v := len(ch.Messages); v != 1 {
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = w.Write([]byte(fmt.Sprintf("unexpected messages len: %d", v)))
-			Warnf(ctx, "unexpected messages len: %d", v)
+			log.Warnf(ctx, "unexpected messages len: %d", v)
 			return
 		}
 
@@ -118,7 +119,7 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = w.Write([]byte(err.Error()))
-			Warnf(ctx, err.Error())
+			log.Warnf(ctx, err.Error())
 			return
 		}
 
@@ -126,7 +127,7 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = w.Write([]byte(err.Error()))
-			Warnf(ctx, err.Error())
+			log.Warnf(ctx, err.Error())
 			return
 		}
 
@@ -141,7 +142,7 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(err.Error()))
-			Warnf(ctx, err.Error())
+			log.Warnf(ctx, err.Error())
 			return
 		}
 
@@ -149,7 +150,7 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 		return
 
 	default:
-		Debugf(ctx, "event payload: %s", string(b))
+		log.Debugf(ctx, "event payload: %s", string(b))
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -165,7 +166,7 @@ func checkSignature(ctx context.Context, header http.Header, body []byte) (int, 
 	if slackRequestTimestamp == "" {
 		return http.StatusBadRequest, errors.New("X-Slack-Request-Timestamp header is required")
 	}
-	Debugf(ctx, "X-Slack-Request-Timestamp: %s", slackRequestTimestamp)
+	log.Debugf(ctx, "X-Slack-Request-Timestamp: %s", slackRequestTimestamp)
 
 	timestamp, err := strconv.ParseInt(slackRequestTimestamp, 10, 64)
 	if err != nil {
@@ -186,14 +187,14 @@ func checkSignature(ctx context.Context, header http.Header, body []byte) (int, 
 	if slackSignature == "" {
 		return http.StatusBadRequest, errors.New("X-Slack-Signature header is required")
 	}
-	Debugf(ctx, "X-Slack-Signature: %s", slackSignature)
+	log.Debugf(ctx, "X-Slack-Signature: %s", slackSignature)
 
 	binarySignature, err := hex.DecodeString(strings.TrimPrefix(slackSignature, "v0="))
 	if err != nil {
 		return http.StatusBadRequest, err
 	}
 
-	Debugf(ctx, "body length: %d", len(body))
+	log.Debugf(ctx, "body length: %d", len(body))
 
 	var buf bytes.Buffer
 	buf.WriteString("v0")
@@ -204,7 +205,7 @@ func checkSignature(ctx context.Context, header http.Header, body []byte) (int, 
 
 	hash := hmac.New(sha256.New, []byte(slackSigningSecret))
 	hash.Write(buf.Bytes())
-	Debugf(ctx, "computed signature: v0=%s", hex.EncodeToString(hash.Sum(nil)))
+	log.Debugf(ctx, "computed signature: v0=%s", hex.EncodeToString(hash.Sum(nil)))
 	if !hmac.Equal(hash.Sum(nil), binarySignature) {
 		return http.StatusBadRequest, errors.New("signature mismatch")
 	}
