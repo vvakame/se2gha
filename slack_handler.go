@@ -131,10 +131,15 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		slackName := userProfile.DisplayName
+		if slackName == "" {
+			slackName = userProfile.RealName
+		}
+
 		err = dispatchGitHubEvent(ctx, &DispatchGitHubEventRequest{
 			SlackEvent:     b,
 			SlackEventType: fmt.Sprintf("%s-%s", rae.Type, rae.Reaction),
-			SlackUserName:  userProfile.RealName,
+			SlackUserName:  slackName,
 			Text:           ch.Messages[0].Text,
 			Reaction:       rae.Reaction,
 			Link:           fmt.Sprintf("https://%s.slack.com/archives/%s/p%s", teamInfo.Name, rae.Item.Channel, strings.ReplaceAll(rae.Item.Timestamp, ".", "")),

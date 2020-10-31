@@ -32,7 +32,7 @@ process something you want on github actions.
     * `SLACK_ACCESS_TOKEN`
     * `GHA_REPO_TOKEN`
     * `GHA_REPOS`
-        * `${RepositoryOwner}/${RepositioryName` format. e.g. `vvakame/se2gha`
+        * `${RepositoryOwner}/${RepositioryName}` format. e.g. `vvakame/se2gha`
         * if you wanna send a event to multiple repositories, you can use `,` to delimiter
 
 ## Example use case
