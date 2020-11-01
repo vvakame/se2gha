@@ -1,4 +1,4 @@
-name: Build & Deploy
+name: Docker build & deploy
 
 on:
   push:
@@ -14,6 +14,7 @@ env:
 
 jobs:
   deploy:
+    name: Docker build & deploy
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2

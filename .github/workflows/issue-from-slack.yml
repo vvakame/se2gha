@@ -1,11 +1,14 @@
 name: 'Create new issue by Slack :create-issue: reaction'
+
 on:
   repository_dispatch:
     types:
       # trigger from https://github.com/vvakame/se2gha Cloud Run instance
       - slack-event-reaction_added-create-issue
+
 jobs:
   process:
+    name: Create issue by slack reaction
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
