@@ -20,13 +20,13 @@ import (
 	"github.com/vvakame/se2gha/log"
 )
 
-type Request struct {
+type SlackChallengeRequest struct {
 	Token     string `json:"token"`
 	Challenge string `json:"challenge"`
 	Type      string `json:"type"`
 }
 
-type Response struct {
+type SlackChallengeResponse struct {
 	Challenge string `json:"challenge"`
 }
 
@@ -55,7 +55,7 @@ func (h *slackEventHandler) eventHandler(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	req := &Request{}
+	req := &SlackChallengeRequest{}
 	err = json.Unmarshal(b, req)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
@@ -65,7 +65,7 @@ func (h *slackEventHandler) eventHandler(w http.ResponseWriter, r *http.Request)
 	log.Debugf(ctx, "event type: %s", req.Type)
 	switch req.Type {
 	case "url_verification":
-		respJSON := &Response{req.Challenge}
+		respJSON := &SlackChallengeResponse{req.Challenge}
 		resp, err := json.Marshal(respJSON)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
