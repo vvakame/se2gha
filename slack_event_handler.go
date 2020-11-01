@@ -11,7 +11,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -20,8 +19,6 @@ import (
 	"github.com/slack-go/slack/slackevents"
 	"github.com/vvakame/se2gha/log"
 )
-
-var api = slack.New(os.Getenv("SLACK_ACCESS_TOKEN"))
 
 type Request struct {
 	Token     string `json:"token"`
@@ -33,7 +30,13 @@ type Response struct {
 	Challenge string `json:"challenge"`
 }
 
-func eventHandler(w http.ResponseWriter, r *http.Request) {
+type slackEventHandler struct {
+	slCli         *slack.Client
+	dsp           *gitHubEventDispatcher
+	signingSecret string
+}
+
+func (h *slackEventHandler) eventHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	b, err := ioutil.ReadAll(r.Body)
@@ -45,7 +48,7 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer r.Body.Close()
 
-	if s, err := checkSignature(ctx, r.Header, b); err != nil {
+	if s, err := h.checkSignature(ctx, r.Header, b); err != nil {
 		w.WriteHeader(s)
 		_, _ = w.Write([]byte(err.Error()))
 		log.Warnf(ctx, err.Error())
@@ -87,33 +90,7 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		rae, ok := ev.InnerEvent.Data.(*slackevents.ReactionAddedEvent)
-		if !ok {
-			w.WriteHeader(http.StatusBadRequest)
-			msg := fmt.Sprintf("unexpected event data type1: %T", ev.InnerEvent.Data)
-			_, _ = w.Write([]byte(msg))
-			log.Warnf(ctx, msg)
-			return
-		}
-
-		msgs, _, _, err := api.GetConversationRepliesContext(ctx, &slack.GetConversationRepliesParameters{
-			ChannelID: rae.Item.Channel,
-			Timestamp: rae.Item.Timestamp,
-		})
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = w.Write([]byte(err.Error()))
-			log.Warnf(ctx, err.Error())
-			return
-		}
-		if v := len(msgs); v != 1 {
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = w.Write([]byte(fmt.Sprintf("unexpected messages len: %d", v)))
-			log.Warnf(ctx, "unexpected messages len: %d", v)
-			return
-		}
-
-		teamInfo, err := api.GetTeamInfoContext(ctx)
+		ghe, err := h.eventCallbackHandler(ctx, b, &ev)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = w.Write([]byte(err.Error()))
@@ -121,27 +98,7 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		userProfile, err := api.GetUserProfileContext(ctx, msgs[0].User, false)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			_, _ = w.Write([]byte(err.Error()))
-			log.Warnf(ctx, err.Error())
-			return
-		}
-
-		slackName := userProfile.DisplayName
-		if slackName == "" {
-			slackName = userProfile.RealName
-		}
-
-		err = dispatchGitHubEvent(ctx, &DispatchGitHubEventRequest{
-			SlackEvent:     b,
-			SlackEventType: fmt.Sprintf("%s-%s", rae.Type, rae.Reaction),
-			SlackUserName:  slackName,
-			Text:           msgs[0].Text,
-			Reaction:       rae.Reaction,
-			Link:           fmt.Sprintf("https://%s.slack.com/archives/%s/p%s", teamInfo.Name, rae.Item.Channel, strings.ReplaceAll(rae.Item.Timestamp, ".", "")),
-		})
+		err = h.dsp.dispatchGitHubEvent(ctx, ghe)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(err.Error()))
@@ -159,12 +116,68 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func checkSignature(ctx context.Context, header http.Header, body []byte) (int, error) {
-	slackSigningSecret := os.Getenv("SLACK_SIGNING_SECRET")
-	if slackSigningSecret == "" {
-		return http.StatusInternalServerError, errors.New("SLACK_SIGNING_SECRET is empty")
+func (h *slackEventHandler) eventCallbackHandler(ctx context.Context, original json.RawMessage, ev *slackevents.EventsAPIEvent) (*DispatchGitHubEventRequest, error) {
+	switch eventType := ev.InnerEvent.Type; eventType {
+	case slackevents.ReactionAdded:
+		rae, ok := ev.InnerEvent.Data.(*slackevents.ReactionAddedEvent)
+		if !ok {
+			return nil, fmt.Errorf("unexpected event data type: %T", ev.InnerEvent.Data)
+		}
+
+		return h.reactionAddedEventHandler(ctx, original, ev, rae)
+
+	default:
+		return nil, fmt.Errorf("unsupported event type: %s", eventType)
+	}
+}
+
+func (h *slackEventHandler) reactionAddedEventHandler(ctx context.Context, original json.RawMessage, ev *slackevents.EventsAPIEvent, rae *slackevents.ReactionAddedEvent) (*DispatchGitHubEventRequest, error) {
+	teamInfo, err := h.slCli.GetTeamInfoContext(ctx)
+	if err != nil {
+		return nil, err
 	}
 
+	msgs, _, _, err := h.slCli.GetConversationRepliesContext(ctx, &slack.GetConversationRepliesParameters{
+		ChannelID: rae.Item.Channel,
+		Timestamp: rae.Item.Timestamp,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if v := len(msgs); v != 1 {
+		return nil, fmt.Errorf(fmt.Sprintf("unexpected messages len: %d", v))
+	}
+
+	userProfile, err := h.slCli.GetUserProfileContext(ctx, msgs[0].User, false)
+	if err != nil {
+		return nil, err
+	}
+
+	slackName := userProfile.DisplayName
+	if slackName == "" {
+		slackName = userProfile.RealName
+	}
+	text := msgs[0].Text
+	messageURL := fmt.Sprintf("https://%s.slack.com/archives/%s/p%s", teamInfo.Name, rae.Item.Channel, strings.ReplaceAll(rae.Item.Timestamp, ".", ""))
+
+	return &DispatchGitHubEventRequest{
+		SlackEvent:     original,
+		SlackEventType: fmt.Sprintf("%s-%s", rae.Type, rae.Reaction),
+		ReactionAdded: &ReactionAddedEventDispatch{
+			UserName: slackName,
+			Text:     text,
+			Reaction: rae.Reaction,
+			Link:     messageURL,
+		},
+
+		SlackUserName: slackName,
+		Text:          text,
+		Reaction:      rae.Reaction,
+		Link:          messageURL,
+	}, nil
+}
+
+func (h *slackEventHandler) checkSignature(ctx context.Context, header http.Header, body []byte) (int, error) {
 	slackRequestTimestamp := header.Get("X-Slack-Request-Timestamp")
 	if slackRequestTimestamp == "" {
 		return http.StatusBadRequest, errors.New("X-Slack-Request-Timestamp header is required")
@@ -206,7 +219,7 @@ func checkSignature(ctx context.Context, header http.Header, body []byte) (int, 
 	buf.WriteString(":")
 	buf.Write(body)
 
-	hash := hmac.New(sha256.New, []byte(slackSigningSecret))
+	hash := hmac.New(sha256.New, []byte(h.signingSecret))
 	hash.Write(buf.Bytes())
 	log.Debugf(ctx, "computed signature: v0=%s", hex.EncodeToString(hash.Sum(nil)))
 	if !hmac.Equal(hash.Sum(nil), binarySignature) {

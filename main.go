@@ -7,9 +7,12 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
+
+	"github.com/google/go-github/v32/github"
+	"github.com/slack-go/slack"
+	"golang.org/x/oauth2"
 
 	"go.opencensus.io/exporter/stackdriver/propagation"
 	"go.opencensus.io/plugin/ochttp"
@@ -17,28 +20,59 @@ import (
 	_ "github.com/slack-go/slack"
 )
 
-var receivers []*ReceiverRepo
-
-type ReceiverRepo struct {
-	Owner string
-	Name  string
-}
-
 func main() {
+	var ghDispatcher *gitHubEventDispatcher
 	{
-		repos, err := parseReceiverRepos(os.Getenv("GHA_REPOS"))
+		ghaRepos := os.Getenv("GHA_REPOS")
+		if ghaRepos == "" {
+			log.Fatal("GHA_REPOS environment variable is required")
+		}
+		ghaRepoToken := os.Getenv("GHA_REPO_TOKEN")
+		if ghaRepoToken == "" {
+			log.Fatal("GHA_REPO_TOKEN environment variable is required")
+		}
+
+		repos, err := parseReceiverRepos(ghaRepos)
 		if err != nil {
 			log.Fatal(err)
 		}
 
-		receivers = repos
+		ts := oauth2.StaticTokenSource(
+			&oauth2.Token{AccessToken: ghaRepoToken},
+		)
+		ctx := context.Background()
+		tc := oauth2.NewClient(ctx, ts)
+		client := github.NewClient(tc)
+
+		ghDispatcher = &gitHubEventDispatcher{
+			ghCli:     client,
+			receivers: repos,
+		}
+	}
+	var seHandler *slackEventHandler
+	{
+		slackAccessToken := os.Getenv("SLACK_ACCESS_TOKEN")
+		if slackAccessToken == "" {
+			log.Fatal("SLACK_ACCESS_TOKEN environment variable is required")
+		}
+		slackSigningSecret := os.Getenv("SLACK_SIGNING_SECRET")
+		if slackSigningSecret == "" {
+			log.Fatal("SLACK_SIGNING_SECRET environment variable is required")
+		}
+
+		api := slack.New(slackAccessToken)
+		seHandler = &slackEventHandler{
+			slCli:         api,
+			dsp:           ghDispatcher,
+			signingSecret: slackSigningSecret,
+		}
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		_, _ = w.Write([]byte("Hello, world"))
+		_, _ = w.Write([]byte(`<a href="https://github.com/vvakame/se2gha">se2gha</a>`))
 	})
-	mux.HandleFunc("/slack/events/action", eventHandler)
+	mux.HandleFunc("/slack/events/action", seHandler.eventHandler)
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -70,32 +104,4 @@ func main() {
 		log.Printf("Failed to gracefully shutdown: %s", err)
 	}
 	log.Println("Server shutdown")
-}
-
-func parseReceiverRepos(reposStr string) ([]*ReceiverRepo, error) {
-	reposStr = strings.TrimSpace(reposStr)
-	ss1 := strings.Split(reposStr, ",")
-
-	var repos []*ReceiverRepo
-	for _, s := range ss1 {
-		s = strings.TrimSpace(s)
-		if s == "" {
-			continue
-		}
-		ss2 := strings.SplitN(s, "/", 2)
-		if len(ss2) != 2 {
-			return nil, fmt.Errorf("invalid GHA_REPOS syntax: %s", s)
-		}
-
-		repos = append(repos, &ReceiverRepo{
-			Owner: ss2[0],
-			Name:  ss2[1],
-		})
-	}
-
-	if len(repos) == 0 {
-		return nil, fmt.Errorf("invalid GHA_REPOS: %s", reposStr)
-	}
-
-	return repos, nil
 }
