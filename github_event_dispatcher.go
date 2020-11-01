@@ -26,15 +26,6 @@ type DispatchGitHubEventRequest struct {
 	SlackEventType string          `json:"slack_event_type"`
 
 	ReactionAdded *ReactionAddedEventDispatch `json:"reaction_added,omitempty"`
-
-	// Deprecated: use dedicated event data.
-	SlackUserName string `json:"slack_user_name"`
-	// Deprecated: use dedicated event data.
-	Text string `json:"text"`
-	// Deprecated: use dedicated event data.
-	Reaction string `json:"reaction"`
-	// Deprecated: use dedicated event data.
-	Link string `json:"link"`
 }
 
 type ReactionAddedEventDispatch struct {

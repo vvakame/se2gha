@@ -169,11 +169,6 @@ func (h *slackEventHandler) reactionAddedEventHandler(ctx context.Context, origi
 			Reaction: rae.Reaction,
 			Link:     messageURL,
 		},
-
-		SlackUserName: slackName,
-		Text:          text,
-		Reaction:      rae.Reaction,
-		Link:          messageURL,
 	}, nil
 }
 
