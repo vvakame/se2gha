@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -132,11 +133,6 @@ func (h *slackEventHandler) eventCallbackHandler(ctx context.Context, original j
 }
 
 func (h *slackEventHandler) reactionAddedEventHandler(ctx context.Context, original json.RawMessage, ev *slackevents.EventsAPIEvent, rae *slackevents.ReactionAddedEvent) (*DispatchGitHubEventRequest, error) {
-	teamInfo, err := h.slCli.GetTeamInfoContext(ctx)
-	if err != nil {
-		return nil, err
-	}
-
 	msgs, _, _, err := h.slCli.GetConversationRepliesContext(ctx, &slack.GetConversationRepliesParameters{
 		ChannelID: rae.Item.Channel,
 		Timestamp: rae.Item.Timestamp,
@@ -157,8 +153,17 @@ func (h *slackEventHandler) reactionAddedEventHandler(ctx context.Context, origi
 	if slackName == "" {
 		slackName = userProfile.RealName
 	}
-	text := msgs[0].Text
-	messageURL := fmt.Sprintf("https://%s.slack.com/archives/%s/p%s", teamInfo.Name, rae.Item.Channel, strings.ReplaceAll(rae.Item.Timestamp, ".", ""))
+
+	msg := msgs[0]
+	text := msg.Text
+	messageURL, err := h.buildSlackURL(ctx, &slackURLFragment{
+		ChannelID: rae.Item.Channel,
+		Timestamp: msg.Timestamp,
+		ThreadTS:  msg.ThreadTimestamp,
+	})
+	if err != nil {
+		return nil, err
+	}
 
 	return &DispatchGitHubEventRequest{
 		SlackEvent:     original,
@@ -222,4 +227,91 @@ func (h *slackEventHandler) checkSignature(ctx context.Context, header http.Head
 	}
 
 	return 0, nil
+}
+
+type slackURLFragment struct {
+	TeamName      string
+	ChannelID     string
+	Timestamp     string
+	ThreadTS      string
+	IsThreadReply *bool
+}
+
+func (h *slackEventHandler) buildSlackURL(ctx context.Context, fragment *slackURLFragment) (string, error) {
+	if fragment.TeamName != "" {
+		// ok
+	} else {
+		teamInfo, err := h.slCli.GetTeamInfoContext(ctx)
+		if err != nil {
+			return "", err
+		}
+		fragment.TeamName = teamInfo.Name
+	}
+	if fragment.ChannelID == "" {
+		return "", errors.New("argument ChannelID is required")
+	}
+	if v := fragment.Timestamp; v != "" && !strings.Contains(v, ".") {
+		ts, err := strconv.ParseUint(v, 10, 64)
+		if err != nil {
+			return "", err
+		}
+		t1 := ts / 1000000
+		t2 := ts % 1000000
+		fragment.Timestamp = fmt.Sprintf("%d.%06d", t1, t2)
+	}
+	if v := fragment.ThreadTS; v != "" && !strings.Contains(v, ".") {
+		ts, err := strconv.ParseUint(v, 10, 64)
+		if err != nil {
+			return "", err
+		}
+		t1 := ts / 1000000
+		t2 := ts % 1000000
+		fragment.ThreadTS = fmt.Sprintf("%d.%06d", t1, t2)
+	}
+
+	if fragment.IsThreadReply != nil {
+		if *fragment.IsThreadReply {
+			if fragment.Timestamp == "" || fragment.ThreadTS == "" {
+				return "", errors.New("argument Timestamp and ThreadTS are required when IsThreadReply == true")
+			}
+		} else {
+			if fragment.ThreadTS != "" {
+				return "", errors.New("argument ThreadTS must be empty when IsThreadReply == false")
+			}
+		}
+	} else if fragment.Timestamp != "" && fragment.ThreadTS != "" {
+		// ok
+	} else {
+		msgs, _, _, err := h.slCli.GetConversationRepliesContext(ctx, &slack.GetConversationRepliesParameters{
+			ChannelID: fragment.ChannelID,
+			Timestamp: fragment.Timestamp,
+		})
+		if err != nil {
+			return "", err
+		}
+		if len(msgs) != 1 {
+			return "", errors.New("retrieved message length is not 1")
+		}
+		msg := msgs[0]
+		if msg.Timestamp != msg.ThreadTimestamp {
+			fragment.Timestamp = msg.Timestamp
+			fragment.ThreadTS = msg.ThreadTimestamp
+		}
+	}
+
+	u := &url.URL{
+		Scheme: "https",
+	}
+	u.Host = fmt.Sprintf("%s.slack.com", fragment.TeamName)
+	u.Path = fmt.Sprintf("/archives/%s", fragment.ChannelID)
+	if fragment.ThreadTS != "" && fragment.Timestamp != fragment.ThreadTS {
+		u.Path += fmt.Sprintf("/p%s", strings.Replace(fragment.ThreadTS, ".", "", 1))
+		vs := url.Values{}
+		vs.Set("thread_ts", fragment.Timestamp)
+		u.RawQuery = vs.Encode()
+	} else {
+		u.Path += fmt.Sprintf("/p%s", strings.Replace(fragment.Timestamp, ".", "", 1))
+	}
+
+	return u.String(), nil
 }
