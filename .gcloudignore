@@ -1,3 +1,6 @@
+.idea/
+
 .github/
 
+.envrc
 vvakame-playground-*.json

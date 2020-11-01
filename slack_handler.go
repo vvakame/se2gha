@@ -96,11 +96,9 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		ch, err := api.GetConversationHistoryContext(ctx, &slack.GetConversationHistoryParameters{
+		msgs, _, _, err := api.GetConversationRepliesContext(ctx, &slack.GetConversationRepliesParameters{
 			ChannelID: rae.Item.Channel,
-			Inclusive: true,
-			Latest:    rae.Item.Timestamp,
-			Limit:     1,
+			Timestamp: rae.Item.Timestamp,
 		})
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
@@ -108,7 +106,7 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 			log.Warnf(ctx, err.Error())
 			return
 		}
-		if v := len(ch.Messages); v != 1 {
+		if v := len(msgs); v != 1 {
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = w.Write([]byte(fmt.Sprintf("unexpected messages len: %d", v)))
 			log.Warnf(ctx, "unexpected messages len: %d", v)
@@ -123,7 +121,7 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		userProfile, err := api.GetUserProfileContext(ctx, ch.Messages[0].User, false)
+		userProfile, err := api.GetUserProfileContext(ctx, msgs[0].User, false)
 		if err != nil {
 			w.WriteHeader(http.StatusBadRequest)
 			_, _ = w.Write([]byte(err.Error()))
@@ -140,7 +138,7 @@ func eventHandler(w http.ResponseWriter, r *http.Request) {
 			SlackEvent:     b,
 			SlackEventType: fmt.Sprintf("%s-%s", rae.Type, rae.Reaction),
 			SlackUserName:  slackName,
-			Text:           ch.Messages[0].Text,
+			Text:           msgs[0].Text,
 			Reaction:       rae.Reaction,
 			Link:           fmt.Sprintf("https://%s.slack.com/archives/%s/p%s", teamInfo.Name, rae.Item.Channel, strings.ReplaceAll(rae.Item.Timestamp, ".", "")),
 		})
