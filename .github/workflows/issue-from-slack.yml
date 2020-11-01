@@ -15,12 +15,31 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           result-encoding: string
           script: |
-            const event = context.payload.client_payload;
+            const event = context.payload.client_payload.reaction_added;
+
+            // check duplicate in recent 3 days.
+            {
+              const checkAfter = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
+              const issues = await github.issues.listForRepo({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                state: "all",
+                since: checkAfter.toISOString(),
+                per_page: 100,
+              });
+              let issue = issues.data.find(issue => issue.title === event.text);
+              if (issue) {
+                console.warn("already exists", issue.html_url);
+                return "";
+              }
+            }
+
+            // create new one
             const bq = "`";
             const body = `
             Someone added ${bq}:${event.reaction}:${bq} reaction on slack!
 
-            [${event.slack_user_name} said](${event.link}),
+            [${event.user_name} said](${event.link}),
             ${event.text}
             `;
             const resp = await github.issues.create({
