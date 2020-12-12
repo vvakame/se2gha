@@ -140,8 +140,10 @@ func (h *slackEventHandler) reactionAddedEventHandler(ctx context.Context, origi
 	if err != nil {
 		return nil, err
 	}
-	if v := len(msgs); v != 1 {
+	if v := len(msgs); v == 0 {
 		return nil, fmt.Errorf(fmt.Sprintf("unexpected messages len: %d", v))
+	} else if v != 1 {
+		log.Debugf(ctx, "messages len: %d", v)
 	}
 
 	userProfile, err := h.slCli.GetUserProfileContext(ctx, msgs[0].User, false)
