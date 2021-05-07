@@ -27,9 +27,9 @@ jobs:
         run: |
           docker push $GHCR_IMAGE_TAG
 
-      - uses: GoogleCloudPlatform/github-actions/setup-gcloud@master
+      - uses: google-github-actions/setup-gcloud@master
         with:
-          version: "315.0.0"
+          version: "339.0.0"
           project_id: ${{ env.GCP_PROJECT_ID }}
           service_account_key: ${{ secrets.GCP_SA_JSON }}
           export_default_credentials: true
