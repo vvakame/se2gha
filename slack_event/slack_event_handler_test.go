@@ -1,4 +1,4 @@
-package main
+package slack_event
 
 import (
 	"context"

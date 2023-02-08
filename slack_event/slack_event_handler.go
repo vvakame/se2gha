@@ -1,4 +1,4 @@
-package main
+package slack_event
 
 import (
 	"bytes"
@@ -9,9 +9,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 	"github.com/vvakame/se2gha/log"
+	"github.com/vvakame/se2gha/togha"
 )
 
 type SlackChallengeRequest struct {
@@ -33,14 +35,63 @@ type SlackChallengeResponse struct {
 
 type slackEventHandler struct {
 	slCli         *slack.Client
-	dsp           *gitHubEventDispatcher
+	dsp           togha.EventDispatcher
 	signingSecret string
+}
+
+type DispatchGitHubEventRequest struct {
+	SlackEvent     json.RawMessage `json:"slack_event"`
+	SlackEventType string          `json:"slack_event_type"`
+
+	ReactionAdded *ReactionAddedEventDispatch `json:"reaction_added,omitempty"`
+}
+
+func (req *DispatchGitHubEventRequest) EventType() (string, error) {
+	return fmt.Sprintf("slack-event-%s", req.SlackEventType), nil
+}
+
+func (req *DispatchGitHubEventRequest) Payload() (json.RawMessage, error) {
+	b, err := json.Marshal(req)
+	if err != nil {
+		return nil, err
+	}
+
+	return b, nil
+}
+
+type ReactionAddedEventDispatch struct {
+	UserName string `json:"user_name"`
+	Text     string `json:"text"`
+	Reaction string `json:"reaction"`
+	Link     string `json:"link"`
+}
+
+func HandleEvent(ctx context.Context, mux *http.ServeMux, dsp togha.EventDispatcher) error {
+	slackAccessToken := os.Getenv("SLACK_ACCESS_TOKEN")
+	if slackAccessToken == "" {
+		return errors.New("SLACK_ACCESS_TOKEN environment variable is required")
+	}
+	slackSigningSecret := os.Getenv("SLACK_SIGNING_SECRET")
+	if slackSigningSecret == "" {
+		return errors.New("SLACK_SIGNING_SECRET environment variable is required")
+	}
+
+	api := slack.New(slackAccessToken)
+
+	h := &slackEventHandler{
+		slCli:         api,
+		dsp:           dsp,
+		signingSecret: slackSigningSecret,
+	}
+	mux.HandleFunc("/slack/events/action", h.eventHandler)
+
+	return nil
 }
 
 func (h *slackEventHandler) eventHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
-	b, err := ioutil.ReadAll(r.Body)
+	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		_, _ = w.Write([]byte(err.Error()))
@@ -99,7 +150,7 @@ func (h *slackEventHandler) eventHandler(w http.ResponseWriter, r *http.Request)
 			return
 		}
 
-		err = h.dsp.dispatchGitHubEvent(ctx, ghe)
+		err = h.dsp.Dispatch(ctx, ghe)
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			_, _ = w.Write([]byte(err.Error()))
@@ -147,7 +198,7 @@ func (h *slackEventHandler) reactionAddedEventHandler(ctx context.Context, origi
 	}
 
 	userProfile, err := h.slCli.GetUserProfileContext(ctx, &slack.GetUserProfileParameters{
-		UserID:         msgs[0].User,
+		UserID:        msgs[0].User,
 		IncludeLabels: false,
 	})
 	if err != nil {
