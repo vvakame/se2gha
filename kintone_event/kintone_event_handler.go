@@ -21,7 +21,7 @@ type DispatchGitHubEventRequest struct {
 }
 
 func (req *DispatchGitHubEventRequest) EventType() (string, error) {
-	return fmt.Sprintf("kintone-event-%s-%s", req.Event.App.ID, req.Event.Type), nil
+	return fmt.Sprintf("kintone-event-%s", req.Event.Type), nil
 }
 
 func (req *DispatchGitHubEventRequest) Payload() (json.RawMessage, error) {
