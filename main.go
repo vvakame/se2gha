@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/vvakame/se2gha/kintone_event"
 	"github.com/vvakame/se2gha/slack_event"
 	"github.com/vvakame/se2gha/togha"
 	"go.opencensus.io/exporter/stackdriver/propagation"
@@ -32,6 +33,11 @@ func main() {
 	})
 
 	err = slack_event.HandleEvent(ctx, mux, dsp)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = kintone_event.HandleEvent(ctx, mux, dsp)
 	if err != nil {
 		log.Fatal(err)
 	}
