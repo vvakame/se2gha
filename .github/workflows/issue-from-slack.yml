@@ -11,8 +11,8 @@ jobs:
     name: Create issue by slack reaction
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/github-script@v3
+      - uses: actions/checkout@v3
+      - uses: actions/github-script@v6
         id:   create-issue
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}

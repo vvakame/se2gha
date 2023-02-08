@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/google/go-github/v32/github"
+	"github.com/google/go-github/v50/github"
 	"github.com/slack-go/slack"
 	"golang.org/x/oauth2"
 

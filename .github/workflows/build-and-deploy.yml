@@ -16,23 +16,33 @@ jobs:
   deploy:
     name: Docker build & deploy
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
 
       - run: |
           docker build . --tag $GHCR_IMAGE_TAG
-      - name: Log into GitHub Container Registry
-        run: echo "${{ secrets.DOCKER_CR_PAT }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
+
+      - uses: docker/login-action@v2
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          # se2gha-ghcr-write
+          password: ${{ secrets.DOCKER_CR_PAT }}
       - name: Push tagged image to GitHub Container Registry
         run: |
           docker push $GHCR_IMAGE_TAG
 
-      - uses: google-github-actions/setup-gcloud@master
+      - uses: google-github-actions/setup-gcloud@v1
         with:
-          version: "339.0.0"
-          project_id: ${{ env.GCP_PROJECT_ID }}
-          service_account_key: ${{ secrets.GCP_SA_JSON }}
-          export_default_credentials: true
+          version: "417.0.0"
+      - uses: google-github-actions/auth@v1
+        with:
+          workload_identity_provider: projects/381521917100/locations/global/workloadIdentityPools/github-actions/providers/gha-provider
+          service_account: se2gha-deployer@vvakame-playground.iam.gserviceaccount.com
+          access_token_lifetime: 1200s
       - name: Push tagged image to Google Container Registry
         run: |
           gcloud auth configure-docker

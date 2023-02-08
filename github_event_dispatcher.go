@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/google/go-github/v32/github"
+	"github.com/google/go-github/v50/github"
 	"github.com/vvakame/se2gha/log"
 	"golang.org/x/sync/errgroup"
 )

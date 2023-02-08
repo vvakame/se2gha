@@ -118,7 +118,7 @@ func (h *slackEventHandler) eventHandler(w http.ResponseWriter, r *http.Request)
 }
 
 func (h *slackEventHandler) eventCallbackHandler(ctx context.Context, original json.RawMessage, ev *slackevents.EventsAPIEvent) (*DispatchGitHubEventRequest, error) {
-	switch eventType := ev.InnerEvent.Type; eventType {
+	switch eventType := ev.InnerEvent.Type; slackevents.EventsAPIType(eventType) {
 	case slackevents.ReactionAdded:
 		rae, ok := ev.InnerEvent.Data.(*slackevents.ReactionAddedEvent)
 		if !ok {
@@ -146,7 +146,10 @@ func (h *slackEventHandler) reactionAddedEventHandler(ctx context.Context, origi
 		log.Debugf(ctx, "messages len: %d", v)
 	}
 
-	userProfile, err := h.slCli.GetUserProfileContext(ctx, msgs[0].User, false)
+	userProfile, err := h.slCli.GetUserProfileContext(ctx, &slack.GetUserProfileParameters{
+		UserID:         msgs[0].User,
+		IncludeLabels: false,
+	})
 	if err != nil {
 		return nil, err
 	}
