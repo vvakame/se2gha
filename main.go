@@ -10,10 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/google/go-github/v50/github"
-	"github.com/slack-go/slack"
-	"golang.org/x/oauth2"
-
+	"github.com/vvakame/se2gha/slack_event"
+	"github.com/vvakame/se2gha/togha"
 	"go.opencensus.io/exporter/stackdriver/propagation"
 	"go.opencensus.io/plugin/ochttp"
 
@@ -21,58 +19,22 @@ import (
 )
 
 func main() {
-	var ghDispatcher *gitHubEventDispatcher
-	{
-		ghaRepos := os.Getenv("GHA_REPOS")
-		if ghaRepos == "" {
-			log.Fatal("GHA_REPOS environment variable is required")
-		}
-		ghaRepoToken := os.Getenv("GHA_REPO_TOKEN")
-		if ghaRepoToken == "" {
-			log.Fatal("GHA_REPO_TOKEN environment variable is required")
-		}
+	ctx := context.Background()
 
-		repos, err := parseReceiverRepos(ghaRepos)
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		ts := oauth2.StaticTokenSource(
-			&oauth2.Token{AccessToken: ghaRepoToken},
-		)
-		ctx := context.Background()
-		tc := oauth2.NewClient(ctx, ts)
-		client := github.NewClient(tc)
-
-		ghDispatcher = &gitHubEventDispatcher{
-			ghCli:     client,
-			receivers: repos,
-		}
-	}
-	var seHandler *slackEventHandler
-	{
-		slackAccessToken := os.Getenv("SLACK_ACCESS_TOKEN")
-		if slackAccessToken == "" {
-			log.Fatal("SLACK_ACCESS_TOKEN environment variable is required")
-		}
-		slackSigningSecret := os.Getenv("SLACK_SIGNING_SECRET")
-		if slackSigningSecret == "" {
-			log.Fatal("SLACK_SIGNING_SECRET environment variable is required")
-		}
-
-		api := slack.New(slackAccessToken)
-		seHandler = &slackEventHandler{
-			slCli:         api,
-			dsp:           ghDispatcher,
-			signingSecret: slackSigningSecret,
-		}
+	dsp, err := togha.NewEventDispatcher(ctx, nil)
+	if err != nil {
+		log.Fatal(err)
 	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte(`<a href="https://github.com/vvakame/se2gha">se2gha</a>`))
 	})
-	mux.HandleFunc("/slack/events/action", seHandler.eventHandler)
+
+	err = slack_event.HandleEvent(ctx, mux, dsp)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	port := os.Getenv("PORT")
 	if port == "" {
