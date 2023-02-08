@@ -35,12 +35,12 @@ func (req *DispatchGitHubEventRequest) Payload() (json.RawMessage, error) {
 
 // https://jp.cybozu.help/k/ja/user/app_settings/set_webhook/webhook_notification.html
 type KintoneEvent struct {
-	ID          string      `json:"id"`
-	Type        string      `json:"type"`
-	App         *KintoneApp `json:"app"`
-	Record      string      `json:"record"`
-	RecordTitle string      `json:"recordTitle"`
-	URL         string      `json:"url"`
+	ID          string          `json:"id"`
+	Type        string          `json:"type"`
+	App         *KintoneApp     `json:"app"`
+	Record      json.RawMessage `json:"record"`
+	RecordTitle string          `json:"recordTitle"`
+	URL         string          `json:"url"`
 }
 
 type KintoneApp struct {
